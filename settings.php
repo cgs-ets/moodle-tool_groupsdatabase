@@ -96,7 +96,7 @@ if ($hassiteconfig) {
     $settings->add(new admin_setting_heading('tool_groupsdatabase_localheader',
         get_string('settingsheaderlocal', 'tool_groupsdatabase'), ''));
 
-    $options = array('id'=>'id', 'idnumber'=>'idnumber', 'shortname'=>'shortname');
+    $options = array('id' => 'id', 'idnumber' => 'idnumber', 'shortname' => 'shortname');
     $settings->add(new admin_setting_configselect('tool_groupsdatabase/localcoursefield',
         get_string('localcoursefield', 'tool_groupsdatabase'), '', 'idnumber', $options));
 

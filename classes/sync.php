@@ -101,7 +101,7 @@ class tool_groupsdatabase_sync {
         // Sanity check - make sure external table has the expected number of records before we trigger the sync.
         $hasenoughrecords = false;
         $count = 0;
-        $minrecords = $this->config->minrecords;
+        $minrows = $this->config->minrecords;
         if (!empty($minrecords)) {
             $sql = "SELECT count(*) FROM $groupstable";
             if ($rs = $extdb->Execute($sql)) {
@@ -116,11 +116,11 @@ class tool_groupsdatabase_sync {
             }
         }
         if (!$hasenoughrecords) {
-            $trace->output("Failed to sync because the external db returned $count records and the minimum required is $minrecords");
+            $trace->output("Failed to sync because the external db returned $count records and the minimum required is $minrows");
             $trace->finished();
             return 1;
         }
-        
+
         $trace->output('Fetching list of current groups and memberships.');
         // Load in the current group memberships.
         $sql = "SELECT g.courseid, g.idnumber as groupidnumber, gm.userid
@@ -174,13 +174,15 @@ class tool_groupsdatabase_sync {
 
                     if (isset($this->groupmembers[$course->id][$groupidnumber][$user->id])) {
                         // The group membership already exists.
-                        $trace->output("Group membership already exists: courseid($course->id) => groupidnumber($groupidnumber) => userid($user->id)");
+                        $trace->output("Group membership already exists: courseid($course->id) => groupidnumber($groupidnumber) " .
+                            "=> userid($user->id)");
                         unset($this->groupmembers[$course->id][$groupidnumber][$user->id]);
                         continue;
                     }
 
                     // Make sure the global grouping exists for this course.
-                    if (!$grouping = $DB->get_record('groupings', array('courseid' => $course->id, 'idnumber' => GLOBAL_GROUPING_IDNUMBER))) {
+                    $params = array('courseid' => $course->id, 'idnumber' => GLOBAL_GROUPING_IDNUMBER);
+                    if (!$grouping = $DB->get_record('groupings', $params)) {
                         $data = new stdClass();
                         $data->courseid = $course->id;
                         $data->idnumber = GLOBAL_GROUPING_IDNUMBER;
@@ -207,11 +209,12 @@ class tool_groupsdatabase_sync {
                       AND gr.courseid = :courseid";
                     $params = array(
                         'groupidnumber' => $groupidnumber,
-                        'groupingidnumber' => GLOBAL_GROUPING_IDNUMBER, 
+                        'groupingidnumber' => GLOBAL_GROUPING_IDNUMBER,
                         'courseid' => $course->id,
                     );
                     if (!$groupid = $DB->get_field_sql($sql, $params)) {
-                        $trace->output("Creating new group: courseid($course->id) => groupidnumber($groupidnumber), groupname($groupname)");
+                        $trace->output("Creating new group: courseid($course->id) => groupidnumber($groupidnumber), " .
+                            "groupname($groupname)");
                         // Create group.
                         $data = new stdClass();
                         $data->name = $groupname;
@@ -225,7 +228,8 @@ class tool_groupsdatabase_sync {
                     }
 
                     // Create group membership.
-                    $trace->output("Adding group membership: courseid($course->id) => groupidnumber($groupidnumber) => userid($user->id)");
+                    $trace->output("Adding group membership: courseid($course->id) => groupidnumber($groupidnumber) => " .
+                        "userid($user->id)");
                     groups_add_member($groupid, $user->id);
                 }
             }
@@ -243,7 +247,8 @@ class tool_groupsdatabase_sync {
                             $trace->output("Unassigning: courseid($courseid) => groupidnumber($groupidnumber) => userid($userid)");
                             groups_remove_member($group->id, $userid);
                         } else {
-                            $trace->output("Failed to unassign: courseid($courseid) => groupidnumber($groupidnumber) => userid($userid). Group was not found.");
+                            $trace->output("Failed to unassign: courseid($courseid) => groupidnumber($groupidnumber) => ".
+                                "userid($userid). Group was not found.");
                         }
                     }
                 }
