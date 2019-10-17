@@ -101,7 +101,7 @@ class tool_groupsdatabase_sync {
         // Sanity check - make sure external table has the expected number of records before we trigger the sync.
         $hasenoughrecords = false;
         $count = 0;
-        $minrows = $this->config->minrecords;
+        $minrecords = $this->config->minrecords;
         if (!empty($minrecords)) {
             $sql = "SELECT count(*) FROM $groupstable";
             if ($rs = $extdb->Execute($sql)) {
@@ -116,7 +116,7 @@ class tool_groupsdatabase_sync {
             }
         }
         if (!$hasenoughrecords) {
-            $trace->output("Failed to sync because the external db returned $count records and the minimum required is $minrows");
+            $trace->output("Failed to sync because the external db returned $count records and the minimum required is $minrecords");
             $trace->finished();
             return 1;
         }
