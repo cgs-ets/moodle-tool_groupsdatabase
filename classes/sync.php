@@ -129,7 +129,7 @@ class tool_groupsdatabase_sync {
             INNER JOIN {groupings} gr ON gr.courseid = g.courseid
             INNER JOIN {groupings_groups} gg ON gg.groupingid = gr.id
           WHERE gr.idnumber = :idnumber";
-        $rs = $DB->get_recordset_sql($sql, array('idnumber' => GLOBAL_GROUPING_IDNUMBER));
+        $rs = $DB->get_recordset_sql($sql, array('idnumber' => static::GLOBAL_GROUPING_IDNUMBER));
         // Cache the group members in an associative array.
         foreach ($rs as $row) {
             $this->groupmembers[$row->courseid][$row->groupidnumber][$row->userid] = $row->userid;
@@ -181,18 +181,18 @@ class tool_groupsdatabase_sync {
                     }
 
                     // Make sure the global grouping exists for this course.
-                    $params = array('courseid' => $course->id, 'idnumber' => GLOBAL_GROUPING_IDNUMBER);
+                    $params = array('courseid' => $course->id, 'idnumber' => static::GLOBAL_GROUPING_IDNUMBER);
                     if (!$grouping = $DB->get_record('groupings', $params)) {
                         $data = new stdClass();
                         $data->courseid = $course->id;
-                        $data->idnumber = GLOBAL_GROUPING_IDNUMBER;
+                        $data->idnumber = static::GLOBAL_GROUPING_IDNUMBER;
                         $data->name = $this->config->groupingname;
                         if (empty($data->name)) {
-                            $data->name = get_string('groupingname', 'tool_groupsdatabase');
+                            $data->name = get_string('groupingnamedefault', 'tool_groupsdatabase');
                         }
                         $data->description = $this->config->groupingdesc;
                         if (empty($data->description)) {
-                            $data->description = get_string('groupingdesc', 'tool_groupsdatabase');
+                            $data->description = get_string('groupingdescdefault', 'tool_groupsdatabase');
                         }
                         $groupingid = groups_create_grouping($data);
                     } else if (!empty($grouping)) {
@@ -209,22 +209,29 @@ class tool_groupsdatabase_sync {
                       AND gr.courseid = :courseid";
                     $params = array(
                         'groupidnumber' => $groupidnumber,
-                        'groupingidnumber' => GLOBAL_GROUPING_IDNUMBER,
+                        'groupingidnumber' => static::GLOBAL_GROUPING_IDNUMBER,
                         'courseid' => $course->id,
                     );
+                    // Check whether group exists before adding memberships.
                     if (!$groupid = $DB->get_field_sql($sql, $params)) {
                         $trace->output("Creating new group: courseid($course->id) => groupidnumber($groupidnumber), " .
                             "groupname($groupname)");
-                        // Create group.
+                        // Set up new group data.
                         $data = new stdClass();
                         $data->name = $groupname;
                         $data->idnumber = $groupidnumber;
                         $data->courseid = $course->id;
-                        $groupid = groups_create_group($data);
+                        try {
+                            // Create the group. 
+                            $groupid = groups_create_group($data);
+                        } catch (moodle_exception $e) {
+                            $message = $e->getMessage();
+                            $trace->output("Could not create new group. Skipping row. Exception message: $message");
+                            continue;
+                        }
 
                         // Set the grouping.
                         groups_assign_grouping($groupingid, $groupid);
-
                     }
 
                     // Create group membership.
@@ -264,7 +271,7 @@ class tool_groupsdatabase_sync {
               WHERE gr.idnumber = :idnumber
               AND gm.groupid IS NULL";
 
-            $fs = $DB->get_fieldset_sql($sql, array('idnumber' => GLOBAL_GROUPING_IDNUMBER));
+            $fs = $DB->get_fieldset_sql($sql, array('idnumber' => static::GLOBAL_GROUPING_IDNUMBER));
             foreach ($fs as $groupid) {
                 groups_delete_group($groupid);
             }

@@ -92,6 +92,14 @@ if ($hassiteconfig) {
         get_string('minrecords', 'tool_groupsdatabase'),
         get_string('minrecords_desc', 'tool_groupsdatabase'), 1));
 
+    $settings->add(new admin_setting_configtext('tool_groupsdatabase/groupingname',
+        get_string('groupingname', 'tool_groupsdatabase'),
+        get_string('groupingname_desc', 'tool_groupsdatabase'), get_string('groupingnamedefault', 'tool_groupsdatabase')));
+
+    $settings->add(new admin_setting_configtext('tool_groupsdatabase/groupingdesc',
+        get_string('groupingdesc', 'tool_groupsdatabase'),
+        '', get_string('groupingdescdefault', 'tool_groupsdatabase')));
+
     // Local fields.
     $settings->add(new admin_setting_heading('tool_groupsdatabase_localheader',
         get_string('settingsheaderlocal', 'tool_groupsdatabase'), ''));
