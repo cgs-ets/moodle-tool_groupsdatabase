@@ -24,8 +24,8 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2019090900; // The current plugin version (Date: YYYYMMDDXX).
+$plugin->version   = 2019102900; // The current plugin version (Date: YYYYMMDDXX).
 $plugin->requires  = 2017111300; // Requires 3.4.
 $plugin->component = 'tool_groupsdatabase';
 $plugin->maturity = MATURITY_STABLE;
-$plugin->release = "1.1";
+$plugin->release = "1.2";
