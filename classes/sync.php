@@ -124,11 +124,11 @@ class tool_groupsdatabase_sync {
         $trace->output('Fetching list of current groups and memberships.');
         // Load in the current group memberships.
         $sql = "SELECT g.courseid, g.idnumber as groupidnumber, gm.userid
-          FROM {groups} g
+                  FROM {groups} g
             INNER JOIN {groups_members} gm ON gm.groupid = g.id
-            INNER JOIN {groupings} gr ON gr.courseid = g.courseid
-            INNER JOIN {groupings_groups} gg ON gg.groupingid = gr.id
-          WHERE gr.idnumber = :idnumber";
+            INNER JOIN {groupings_groups} gr ON gr.courseid = g.courseid
+            INNER JOIN {groupings_groups} gg ON gg.groupingid = gr.id AND gg.groupid = g.id
+                 WHERE gr.idnumber = :idnumber";
         $rs = $DB->get_recordset_sql($sql, array('idnumber' => static::GLOBAL_GROUPING_IDNUMBER));
         // Cache the group members in an associative array.
         foreach ($rs as $row) {
@@ -201,17 +201,16 @@ class tool_groupsdatabase_sync {
 
                     // Check if group exists in the course.
                     $sql = "SELECT g.id
-                      FROM {groups} g
+                              FROM {groups} g
                         INNER JOIN {groupings} gr ON gr.courseid = g.courseid
-                        INNER JOIN {groupings_groups} gg ON gg.groupingid = gr.id
-                      WHERE g.idnumber = :groupidnumber
-                      AND gr.idnumber = :groupingidnumber
-                      AND gr.courseid = :courseid";
+                        INNER JOIN {groupings_groups} gg ON gg.groupingid = gr.id AND gg.groupid = g.id
+                             WHERE g.idnumber = :groupidnumber
+                               AND gr.idnumber = :groupingidnumber
+                               AND gr.courseid = :courseid";
                     $params = array(
                         'groupidnumber' => $groupidnumber,
                         'groupingidnumber' => static::GLOBAL_GROUPING_IDNUMBER,
-                        'courseid' => $course->id,
-                    );
+                        'courseid' => $course->id);
                     // Check whether group exists before adding memberships.
                     if (!$groupid = $DB->get_field_sql($sql, $params)) {
                         $trace->output("Creating new group: courseid($course->id) => groupidnumber($groupidnumber), " .
@@ -264,13 +263,12 @@ class tool_groupsdatabase_sync {
             // Find and delete empty groups.
             $trace->output('Removing empty groups.');
             $sql = "SELECT g.id
-              FROM {groups} g
-                LEFT JOIN {groups_members} gm ON gm.groupid = g.id
-                LEFT JOIN {groupings_groups} gg ON gg.groupid = g.id
-                LEFT JOIN {groupings} gr ON gr.courseid = g.courseid
-              WHERE gr.idnumber = :idnumber
-              AND gm.groupid IS NULL";
-
+                      FROM {groups} g
+                 LEFT JOIN {groups_members} gm ON gm.groupid = g.id
+                INNER JOIN {groupings} gr ON gr.courseid = g.courseid
+                INNER JOIN {groupings_groups} gg ON gg.groupingid = gr.id AND gg.groupid = g.id
+                     WHERE gr.idnumber = :idnumber
+                       AND gm.groupid IS NULL";
             $fs = $DB->get_fieldset_sql($sql, array('idnumber' => static::GLOBAL_GROUPING_IDNUMBER));
             foreach ($fs as $groupid) {
                 groups_delete_group($groupid);
