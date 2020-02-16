@@ -126,7 +126,7 @@ class tool_groupsdatabase_sync {
         $sql = "SELECT g.courseid, g.idnumber as groupidnumber, gm.userid
                   FROM {groups} g
             INNER JOIN {groups_members} gm ON gm.groupid = g.id
-            INNER JOIN {groupings_groups} gr ON gr.courseid = g.courseid
+            INNER JOIN {groupings} gr ON gr.courseid = g.courseid
             INNER JOIN {groupings_groups} gg ON gg.groupingid = gr.id AND gg.groupid = g.id
                  WHERE gr.idnumber = :idnumber";
         $rs = $DB->get_recordset_sql($sql, array('idnumber' => static::GLOBAL_GROUPING_IDNUMBER));
