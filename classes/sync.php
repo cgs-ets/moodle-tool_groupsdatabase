@@ -262,17 +262,21 @@ class tool_groupsdatabase_sync {
 
             // Find and delete empty groups.
             $trace->output('Removing empty groups.');
-            $sql = "SELECT g.id
+            $sql = "SELECT g.id, g.name
                       FROM {groups} g
                  LEFT JOIN {groups_members} gm ON gm.groupid = g.id
                 INNER JOIN {groupings} gr ON gr.courseid = g.courseid
                 INNER JOIN {groupings_groups} gg ON gg.groupingid = gr.id AND gg.groupid = g.id
                      WHERE gr.idnumber = :idnumber
                        AND gm.groupid IS NULL";
-            $fs = $DB->get_fieldset_sql($sql, array('idnumber' => static::GLOBAL_GROUPING_IDNUMBER));
-            foreach ($fs as $groupid) {
-                groups_delete_group($groupid);
+
+            $rs = $DB->get_recordset_sql($sql, array('idnumber' => static::GLOBAL_GROUPING_IDNUMBER));
+            foreach ($rs as $row) {
+                $trace->output('Deleting group: $row->id, $row->name');
+                groups_delete_group($row->id);
+
             }
+            $rs->close();
         }
 
         $trace->finished();
