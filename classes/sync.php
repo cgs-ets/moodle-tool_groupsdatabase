@@ -48,6 +48,11 @@ class tool_groupsdatabase_sync {
     protected $config;
 
     /**
+     * @var array Courses in the external database.
+     */
+    protected $coursementions = [];
+
+    /**
      * @var array The current groups.
      */
     protected $groupmembers = [];
@@ -122,30 +127,21 @@ class tool_groupsdatabase_sync {
         }
 
         $trace->output('Fetching list of current groups and memberships.');
-        // Load in the current group memberships. Exclude ended courses to preserve their groups.
-        $timeofsync = time();
+        // Load in the current group memberships.
         $sql = "SELECT g.courseid, g.idnumber as groupidnumber, gm.userid
                   FROM {groups} g
             INNER JOIN {groups_members} gm ON gm.groupid = g.id
             INNER JOIN {groupings} gr ON gr.courseid = g.courseid
             INNER JOIN {groupings_groups} gg ON gg.groupingid = gr.id AND gg.groupid = g.id
-            INNER JOIN {course} c ON c.id = g.courseid
-                 WHERE gr.idnumber = :idnumber
-                   AND ( c.enddate = 0 OR c.enddate > :timenow )
-                   AND c.visible = 1";
-
-        $rs = $DB->get_recordset_sql($sql, array(
-            'idnumber' => static::GLOBAL_GROUPING_IDNUMBER,
-            'timenow'  => $timeofsync,
-        ));
-
+                 WHERE gr.idnumber = :idnumber";
+        $rs = $DB->get_recordset_sql($sql, array('idnumber' => static::GLOBAL_GROUPING_IDNUMBER));
         // Cache the group members in an associative array.
         foreach ($rs as $row) {
             $this->groupmembers[$row->courseid][$row->groupidnumber][$row->userid] = $row->userid;
         }
         $rs->close();
 
-        // Get records from the external database and assign groupss.
+        // Get records from the external database and assign groups.
         $trace->output('Starting groups database user sync');
         $sql = $this->db_get_sql($groupstable);
         if ($rs = $extdb->Execute($sql)) {
@@ -163,16 +159,9 @@ class tool_groupsdatabase_sync {
                     }
 
                     // Check that the course exists.
-                    if (!$course = $DB->get_record('course', array($localcoursefield => $fields[$coursefield]), 'id,visible,enddate')) {
+                    if (!$course = $DB->get_record('course', array($localcoursefield => $fields[$coursefield]), 'id,visible')) {
                         $trace->output("error: skipping row due to unknown course $localcoursefield
                             '$fields[$coursefield]'", 1);
-                        continue;
-                    }
-
-                    // Do not sync ended or invisible courses.
-                    if ((!$course->visible) || ($course->enddate != 0 && $course->enddate <= $timeofsync)) {
-                        $trace->output("error: skipping row because course $localcoursefield
-                            '$fields[$coursefield]' has ended or is not visible.", 1);
                         continue;
                     }
 
@@ -183,6 +172,9 @@ class tool_groupsdatabase_sync {
                             '$fields[$userfield]'", 1);
                         continue;
                     }
+
+                    // Add the course to the coursementions.
+                    $this->coursementions[] = $course->id;
 
                     // Set group vars for better readability.
                     $groupidnumber = $fields[$groupcodefield];
@@ -258,10 +250,18 @@ class tool_groupsdatabase_sync {
         }
         $extdb->Close();
 
+
+        $this->coursementions = array_unique($this->coursementions);
+
         if (empty($removeaction) && !empty($this->groupmembers)) {
             // Unassign remaining memberships.
             $trace->output('Removing group memberships that are no longer in external database.');
             foreach ($this->groupmembers as $courseid => $group) {
+                if ( ! in_array($courseid, $this->coursementions) ) {
+                    // If a course was not present in the external data at all then do not remove
+                    // anything. This is to preserve groups in archived courses.
+                    continue;
+                }
                 foreach ($group as $groupidnumber => $users) {
                     foreach ($users as $userid) {
                         $params = array('courseid' => $courseid, 'idnumber' => $groupidnumber);
@@ -276,9 +276,9 @@ class tool_groupsdatabase_sync {
                 }
             }
 
-            // Find and delete empty groups.
+            // Find and delete empty groups. Do not delete groups that are in courses that were not present in the external data.
             $trace->output('Removing empty groups.');
-            $sql = "SELECT g.id, g.name
+            $sql = "SELECT g.id, g.name, g.courseid
                       FROM {groups} g
                  LEFT JOIN {groups_members} gm ON gm.groupid = g.id
                 INNER JOIN {groupings} gr ON gr.courseid = g.courseid
@@ -288,9 +288,12 @@ class tool_groupsdatabase_sync {
 
             $rs = $DB->get_recordset_sql($sql, array('idnumber' => static::GLOBAL_GROUPING_IDNUMBER));
             foreach ($rs as $row) {
+                if ( ! in_array($row->courseid, $this->coursementions) ) {
+                    // Course was not present in the external data
+                    continue;
+                }
                 $trace->output('Deleting group: $row->id, $row->name');
                 groups_delete_group($row->id);
-
             }
             $rs->close();
         }
