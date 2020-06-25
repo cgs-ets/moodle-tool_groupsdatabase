@@ -122,14 +122,23 @@ class tool_groupsdatabase_sync {
         }
 
         $trace->output('Fetching list of current groups and memberships.');
-        // Load in the current group memberships.
+        // Load in the current group memberships. Exclude ended courses to preserve their groups.
+        $timeofsync = time();
         $sql = "SELECT g.courseid, g.idnumber as groupidnumber, gm.userid
                   FROM {groups} g
             INNER JOIN {groups_members} gm ON gm.groupid = g.id
             INNER JOIN {groupings} gr ON gr.courseid = g.courseid
             INNER JOIN {groupings_groups} gg ON gg.groupingid = gr.id AND gg.groupid = g.id
-                 WHERE gr.idnumber = :idnumber";
-        $rs = $DB->get_recordset_sql($sql, array('idnumber' => static::GLOBAL_GROUPING_IDNUMBER));
+            INNER JOIN {course} c ON c.id = g.courseid
+                 WHERE gr.idnumber = :idnumber
+                   AND ( c.enddate = 0 OR c.enddate > :timenow )
+                   AND c.visible = 1";
+
+        $rs = $DB->get_recordset_sql($sql, array(
+            'idnumber' => static::GLOBAL_GROUPING_IDNUMBER,
+            'timenow'  => $timeofsync,
+        ));
+
         // Cache the group members in an associative array.
         foreach ($rs as $row) {
             $this->groupmembers[$row->courseid][$row->groupidnumber][$row->userid] = $row->userid;
@@ -154,9 +163,16 @@ class tool_groupsdatabase_sync {
                     }
 
                     // Check that the course exists.
-                    if (!$course = $DB->get_record('course', array($localcoursefield => $fields[$coursefield]), 'id,visible')) {
+                    if (!$course = $DB->get_record('course', array($localcoursefield => $fields[$coursefield]), 'id,visible,enddate')) {
                         $trace->output("error: skipping row due to unknown course $localcoursefield
                             '$fields[$coursefield]'", 1);
+                        continue;
+                    }
+
+                    // Do not sync ended or invisible courses.
+                    if ((!$course->visible) || ($course->enddate != 0 && $course->enddate <= $timeofsync)) {
+                        $trace->output("error: skipping row because course $localcoursefield
+                            '$fields[$coursefield]' has ended or is not visible.", 1);
                         continue;
                     }
 
