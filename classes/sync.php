@@ -292,7 +292,7 @@ class tool_groupsdatabase_sync {
                     // Course was not present in the external data
                     continue;
                 }
-                $trace->output('Deleting group: $row->id, $row->name');
+                $trace->output("Deleting group: $row->id, $row->name");
                 groups_delete_group($row->id);
             }
             $rs->close();
