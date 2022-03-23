@@ -244,7 +244,10 @@ class tool_groupsdatabase_sync {
                     // Create group membership.
                     $trace->output("Adding group membership: courseid($course->id) => groupidnumber($groupidnumber) => " .
                         "userid($user->id)");
-                    groups_add_member($groupid, $user->id);
+                    $result = groups_add_member($groupid, $user->id);
+                    if (!$result) {
+                        $trace->output("Failed to add: courseid($course->id) => groupidnumber($groupidnumber) => userid($user->id). User may be deleted or not enrolled in course.");
+                    }
                 }
             }
         }
